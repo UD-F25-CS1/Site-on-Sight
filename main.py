@@ -2,7 +2,6 @@ from drafter import set_site_information, hide_debug_information, set_website_ti
 from dataclasses import dataclass
 from drafter.llm import LLMMessage, LLMResponse, call_gemini, set_gemini_server
 from typing import Optional
-import json
 
 
 
@@ -40,8 +39,6 @@ class State:
     """
     last_website: Optional[WebsiteBuild]
     last_description: str
-    # Raw LLM response (for debugging) - may be a long string
-    last_raw_response: Optional[str]
 
 
 @route
@@ -119,7 +116,7 @@ Format your response with these exact tags:
             "</body></html>"
         )
         new_website = WebsiteBuild(error_html, "", "")
-        new_state = State(new_website, description, None)
+        new_state = State(new_website, description)
         return show_builder(new_state)
 
     # If the library returned a structured error (not an LLMResponse), try
@@ -128,7 +125,6 @@ Format your response with these exact tags:
     content_text = None
     if isinstance(result, LLMResponse):
         content_text = result.content
-        raw_text = result.content
     else:
         # Try common fallbacks: dict-like with 'parts', or .message
         try:
@@ -142,7 +138,6 @@ Format your response with these exact tags:
                     else:
                         assembled.append(str(p))
                 content_text = "".join(assembled)
-                raw_text = json.dumps(result)
             elif hasattr(result, "message") or hasattr(result, "__dict__"):
                 # library-style error object with a message (use getattr fallback)
                 err_msg = getattr(result, "message", str(result))
@@ -152,12 +147,11 @@ Format your response with these exact tags:
                     "</body></html>"
                 )
                 new_website = WebsiteBuild(error_html, "", "")
-                new_state = State(new_website, description, getattr(result, "message", str(result)))
+                new_state = State(new_website, description)
                 return show_builder(new_state)
             else:
                 # Last resort: stringify the object
                 content_text = str(result)
-                raw_text = str(result)
         except KeyError as ke:
             # This often surfaces as "'parts'" in error messages
             error_html = (
@@ -166,18 +160,13 @@ Format your response with these exact tags:
                 "</body></html>"
             )
             new_website = WebsiteBuild(error_html, "", "")
-            new_state = State(new_website, description, None)
+            new_state = State(new_website, description)
             return show_builder(new_state)
 
     # If we have some text from the LLM, parse it into html/css/js
     if content_text:
         new_website = parse_website_response(content_text)
-        # Save raw response when available
-        try:
-            last_raw = raw_text  # defined above in parsing branches
-        except NameError:
-            last_raw = None
-        new_state = State(new_website, description, last_raw)
+        new_state = State(new_website, description)
     else:
         # No usable content returned
         error_html = (
@@ -186,7 +175,7 @@ Format your response with these exact tags:
             "</body></html>"
         )
         new_website = WebsiteBuild(error_html, "", "")
-        new_state = State(new_website, description, None)
+        new_state = State(new_website, description)
 
     return show_builder(new_state)
 
@@ -197,8 +186,7 @@ def show_builder(state: State) -> Page:
         "Describe the website you want to build:",
         TextArea("description", "", rows=5, cols=50),
         LineBreak(),
-        Button("Build Website", "build_website"),
-        Button("Show Raw Response", "debug_view"),
+        Button("Build Website", build_website), # type: ignore
     ]
 
     # Show the last built website if it exists
@@ -208,37 +196,10 @@ def show_builder(state: State) -> Page:
             "Your Built Website:",
             state.last_website.website_html,
             LineBreak(),
-            Button("Build Another", "index"),
+            Button("Build Another", index), # type: ignore
         ])
 
     return Page(state, content)
 
 
-@route
-def debug_view(state: State) -> Page:
-    """Show raw LLM response and full state for debugging."""
-    content = [
-        "**Debug: Raw LLM Response**",
-        LineBreak(),
-    ]
-
-    raw = state.last_raw_response or "<no raw response available>"
-    # Show raw response in a preformatted block
-    content.append("Raw response:")
-    content.append(raw)
-    content.append(LineBreak())
-    content.append("Current state:")
-    # Show state fields
-    content.append(f"last_description: {state.last_description}")
-    if state.last_website:
-        content.append("last_website.html:")
-        content.append(state.last_website.website_html)
-    else:
-        content.append("last_website: None")
-
-    content.append(LineBreak())
-    content.append(Button("Back", "index"))
-    return Page(state, content)
-
-
-start_server(State(None, "", None))
+start_server(State(None, ""))
