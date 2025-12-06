@@ -138,11 +138,12 @@ Format your response with these exact tags:
                     else:
                         assembled.append(str(p))
                 content_text = "".join(assembled)
-            elif hasattr(result, "message"):
-                # library-style error object with a message
+            elif hasattr(result, "message") or hasattr(result, "__dict__"):
+                # library-style error object with a message (use getattr fallback)
+                err_msg = getattr(result, "message", str(result))
                 error_html = (
                     "<html><body><h1>Error building website</h1>"
-                    f"<p>{result.message}</p>"
+                    f"<p>{err_msg}</p>"
                     "</body></html>"
                 )
                 new_website = WebsiteBuild(error_html, "", "")
