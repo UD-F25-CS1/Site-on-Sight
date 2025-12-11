@@ -1,3 +1,3 @@
-This repository is a template that you can use to create and deploy a new ADVANCED Drafter web application.
-
-Follow the instructions here to deploy this: <https://drafter-edu.github.io/drafter/students/deployment.html>
+This program builds a website using user inputs. The user inputs are given to Google Geminni to
+convert to a website, which our program then parses to convert to code. Finally the code is
+displayed to the user as a website. 
